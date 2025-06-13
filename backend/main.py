@@ -3,7 +3,7 @@ import json
 import re
 import logging
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from pydantic import BaseModel, HttpUrl
 import httpx
 import aiofiles
@@ -38,7 +38,11 @@ def load_config():
             return json.load(f)
     except Exception as e:
         logger.error(f"Ошибка при чтении config.json: {e}")
-        return {}
+        # Значения по умолчанию
+        return {
+            "use_anomaly_detector": False,
+            "use_geo_classifier": False
+        }
 
 config = load_config()
 
@@ -262,3 +266,27 @@ async def recognize_speech_offline(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Ошибка офлайн-распознавания речи: {e}")
         raise HTTPException(status_code=500, detail="Ошибка офлайн-распознавания речи")
+
+@app.get("/settings")
+def get_settings():
+    return config
+
+@app.post("/settings")
+def update_settings(new_settings: dict):
+    config.update(new_settings)
+    # Сохраняем изменения в файл
+    with open("backend/config.json", "w") as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+    return config
+
+@app.get("/settings_ui", response_class=HTMLResponse)
+def settings_ui():
+    return FileResponse("backend/settings.html")
+
+if config.get("use_anomaly_detector", False):
+    # использовать config["anomaly_threshold"] при обработке
+    pass
+
+if config.get("use_speech_recognition", False):
+    # включить/выключить распознавание речи
+    pass
