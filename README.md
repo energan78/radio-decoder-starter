@@ -7,6 +7,8 @@
 - Загрузка и хранение пользовательских примеров сигналов
 - REST API для загрузки, классификации и пополнения библиотеки сигналов
 - Онлайн и офлайн распознавание речи из аудиофайлов (Google Speech и Vosk)
+- Детектор аномалий, геоклассификация, анализ эмоций в речи
+- Веб-интерфейс для управления всеми функциями и настройками
 
 ---
 
@@ -52,7 +54,7 @@ pip install -r backend/requirements.txt
    mv /path/to/RML2018.01A.h5 backend/radioml2018/
    ```
 
-3. **Теперь обучение модели будет использовать этот датасет автоматически.**
+3. **Путь к датасету можно изменить через веб-интерфейс или в `backend/config.json`.**
 
 ---
 
@@ -69,6 +71,7 @@ python3 backend/train_signal_model.py
 1. Скачайте русскую модель Vosk с https://alphacephei.com/vosk/models  
    Например, [vosk-model-small-ru-0.22.zip](https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip)
 2. Распакуйте её в папку `backend/vosk-model-ru/`
+3. Путь к модели можно изменить через веб-интерфейс или в `backend/config.json`.
 
 ---
 
@@ -80,6 +83,14 @@ uvicorn backend.main:app --reload
 
 - Сервер будет доступен по адресу: http://localhost:8000
 - Документация API: http://localhost:8000/docs
+- **Веб-интерфейс управления:** http://localhost:8000/settings_ui
+
+---
+
+## Управление настройками через веб-интерфейс
+
+Откройте [http://localhost:8000/settings_ui](http://localhost:8000/settings_ui)  
+Вы сможете включать/отключать функции, менять пути к моделям и датасетам, настраивать параметры AI-модулей.
 
 ---
 
@@ -105,6 +116,14 @@ uvicorn backend.main:app --reload
   ```
   POST /recognize_speech_offline
   ```
+- **Детектор аномалий:**
+  ```
+  POST /detect_anomaly
+  ```
+- **Геоклассификация:**
+  ```
+  POST /classify_by_geo
+  ```
 
 ---
 
@@ -126,5 +145,4 @@ curl -X POST "http://localhost:8000/recognize_speech_offline" \
 - Для офлайн-распознавания речи требуется модель Vosk (см. выше).
 - Для онлайн-распознавания речи требуется интернет-соединение.
 - Для обучения на RadioML 2018.01A требуется файл `RML2018.01A.h5` в папке `backend/radioml2018/`.
-
----
+- Все основные параметры и функции можно настраивать через веб-интерфейс по адресу [http://localhost:8000/settings_ui](http://localhost:8000/settings_ui).
