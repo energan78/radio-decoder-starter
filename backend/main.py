@@ -11,6 +11,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+from backend.train_signal_model import ConvSignalNet, SAMPLE_LEN
+import speech_recognition as sr
+from fastapi import UploadFile, File
+from pydub import AudioSegment
+from vosk import Model, KaldiRecognizer
+import wave
+import json
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -107,7 +114,7 @@ MODEL_PATH = "backend/signal_model.pth"
 def load_model():
     checkpoint = torch.load(MODEL_PATH, map_location="cpu")
     classes = checkpoint["classes"]
-    model = SimpleSignalNet(len(classes))
+    model = ConvSignalNet(len(classes))
     model.load_state_dict(checkpoint["model_state"])
     model.eval()
     return model, classes
@@ -161,3 +168,97 @@ async def add_signal(request: AddSignalRequest, file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Ошибка добавления сигнала: {e}")
         raise HTTPException(status_code=500, detail="Ошибка добавления сигнала")
+
+VOSK_MODEL_PATH = "backend/vosk-model-ru"
+
+class SpeechRecognitionResponse(BaseModel):
+    text: str
+    comment: str
+
+@app.post("/recognize_speech", response_model=SpeechRecognitionResponse, summary="Распознавание речи из аудиофайла")
+async def recognize_speech(file: UploadFile = File(...)):
+    try:
+        # Сохраняем файл во временный WAV
+        temp_path = f"/tmp/{file.filename}"
+        async with aiofiles.open(temp_path, "wb") as f:
+            await f.write(await file.read())
+
+        # Если файл не WAV, конвертируем в WAV
+        if not temp_path.lower().endswith(".wav"):
+            audio = AudioSegment.from_file(temp_path)
+            temp_wav = temp_path + ".wav"
+            audio.export(temp_wav, format="wav")
+            temp_path = temp_wav
+
+        recognizer = sr.Recognizer()
+        with sr.AudioFile(temp_path) as source:
+            audio = recognizer.record(source)
+        try:
+            text = recognizer.recognize_google(audio, language="ru-RU")
+            comment = "Обнаружена речь" if text.strip() else "Речь не обнаружена"
+        except sr.UnknownValueError:
+            text = ""
+            comment = "Речь не обнаружена"
+        except Exception as e:
+            text = ""
+            comment = f"Ошибка распознавания: {e}"
+
+        logger.info(f"Распознанный текст: {text}")
+        return SpeechRecognitionResponse(text=text, comment=comment)
+    except Exception as e:
+        logger.error(f"Ошибка распознавания речи: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка распознавания речи")
+
+@app.post("/recognize_speech_offline", response_model=SpeechRecognitionResponse, summary="Офлайн-распознавание речи из аудиофайла")
+async def recognize_speech_offline(file: UploadFile = File(...)):
+    try:
+        # Сохраняем файл во временный WAV
+        temp_path = f"/tmp/{file.filename}"
+        async with aiofiles.open(temp_path, "wb") as f:
+            await f.write(await file.read())
+
+        # Если файл не WAV, конвертируем в WAV
+        if not temp_path.lower().endswith(".wav"):
+            audio = AudioSegment.from_file(temp_path)
+            temp_wav = temp_path + ".wav"
+            audio.export(temp_wav, format="wav")
+            temp_path = temp_wav
+
+        # Открываем WAV-файл
+        wf = wave.open(temp_path, "rb")
+        if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getframerate() not in [8000, 16000, 44100]:
+            # Преобразуем в нужный формат
+            audio = AudioSegment.from_file(temp_path)
+            audio = audio.set_channels(1).set_frame_rate(16000).set_sample_width(2)
+            temp_fixed = temp_path + ".fixed.wav"
+            audio.export(temp_fixed, format="wav")
+            wf = wave.open(temp_fixed, "rb")
+
+        # Загружаем модель Vosk
+        if not os.path.exists(VOSK_MODEL_PATH):
+            raise Exception("Vosk model not found!")
+        model = Model(VOSK_MODEL_PATH)
+        rec = KaldiRecognizer(model, wf.getframerate())
+        rec.SetWords(True)
+
+        # Распознаём аудио
+        result_text = ""
+        while True:
+            data = wf.readframes(4000)
+            if len(data) == 0:
+                break
+            if rec.AcceptWaveform(data):
+                part = json.loads(rec.Result())
+                result_text += part.get("text", "") + " "
+        # Финальный результат
+        part = json.loads(rec.FinalResult())
+        result_text += part.get("text", "")
+
+        result_text = result_text.strip()
+        comment = "Обнаружена речь" if result_text else "Речь не обнаружена"
+
+        logger.info(f"Vosk офлайн-распознавание: {result_text}")
+        return SpeechRecognitionResponse(text=result_text, comment=comment)
+    except Exception as e:
+        logger.error(f"Ошибка офлайн-распознавания речи: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка офлайн-распознавания речи")

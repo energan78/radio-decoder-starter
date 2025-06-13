@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Signal Viewer</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        img { max-width: 400px; display: block; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Список сигналов</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Имя файла</th>
+                <th>Класс</th>
+                <th>Комментарий</th>
+                <th>Спектр</th>
+                <th>Редактировать</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for s in signals %}
+            <tr>
+                <td>{{ s.filename }}</td>
+                <td>{{ s.class }}</td>
+                <td>{{ s.comment if s.comment else "" }}</td>
+                <td><a href="/fft/{{ s.filename }}" target="_blank">Показать FFT</a></td>
+                <td>
+                    <form action="/update" method="post">
+                        <input type="hidden" name="filename" value="{{ s.filename }}">
+                        <input type="text" name="new_class" value="{{ s.class }}">
+                        <input type="text" name="comment" placeholder="Комментарий" value="{{ s.comment if s.comment else '' }}">
+                        <button type="submit">Обновить</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

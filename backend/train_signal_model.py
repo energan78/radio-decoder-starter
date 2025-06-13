@@ -74,6 +74,24 @@ class SimpleSignalNet(nn.Module):
         x = self.fc2(x)
         return x
 
+class ConvSignalNet(nn.Module):
+    def __init__(self, num_classes):
+        super().__init__()
+        self.conv1 = nn.Conv1d(1, 16, 5, padding=2)
+        self.pool = nn.MaxPool1d(2)
+        self.conv2 = nn.Conv1d(16, 32, 5, padding=2)
+        self.fc1 = nn.Linear(32 * (SAMPLE_LEN // 4), 128)
+        self.fc2 = nn.Linear(128, num_classes)
+
+    def forward(self, x):
+        x = x.unsqueeze(1)  # (batch, 1, SAMPLE_LEN)
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+
 def train():
     dataset = SignalDataset(SIGNAL_LIBRARY_PATH, SAMPLE_LEN, radioml2018_path=RADIOML2018_PATH)
     train_idx, val_idx = train_test_split(range(len(dataset)), test_size=0.2, random_state=42)
@@ -82,7 +100,7 @@ def train():
     train_loader = DataLoader(train_set, batch_size=32, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=32)
 
-    model = SimpleSignalNet(num_classes=len(dataset.classes))
+    model = ConvSignalNet(num_classes=len(dataset.classes))
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     criterion = nn.CrossEntropyLoss()
 
