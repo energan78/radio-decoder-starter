@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Загрузка сигнала</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f4f8; }
+        .container { background: #fff; max-width: 400px; margin: 40px auto; padding: 32px 24px 24px 24px; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.08);}
+        h2 { text-align: center; color: #1976d2; }
+        label { display: block; margin: 18px 0 8px 0; }
+        input[type="file"], input[type="text"] { width: 100%; }
+        button { background: #1976d2; color: #fff; border: none; padding: 10px 24px; border-radius: 6px; font-size: 1em; cursor: pointer; margin-top: 18px; width: 100%; }
+        button:hover { background: #125ea8; }
+        #status { margin-top: 18px; text-align: center; font-weight: bold; }
+        .success { color: #388e3c; }
+        .error { color: #d32f2f; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Загрузка нового сигнала</h2>
+        <form id="uploadForm">
+            <label>Файл сигнала (IQ-данные):</label>
+            <input type="file" id="file" required />
+            <label>Тип сигнала (например, FM, AM):</label>
+            <input type="text" id="signal_type" required />
+            <button type="submit">Загрузить</button>
+        </form>
+        <div id="status"></div>
+    </div>
+    <script>
+        document.getElementById('uploadForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const file = document.getElementById('file').files[0];
+            const signal_type = document.getElementById('signal_type').value;
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('signal_type', signal_type);
+            const res = await fetch('/add_signal', { method: 'POST', body: formData });
+            if (res.ok) {
+                document.getElementById('status').textContent = "Файл успешно загружен!";
+                document.getElementById('status').className = "success";
+            } else {
+                document.getElementById('status').textContent = "Ошибка загрузки!";
+                document.getElementById('status').className = "error";
+            }
+        };
+    </script>
+</body>
+</html>

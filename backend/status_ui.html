@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Состояние сервера</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f4f8; }
+        .container { background: #fff; max-width: 400px; margin: 40px auto; padding: 32px 24px 24px 24px; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.08);}
+        h2 { text-align: center; color: #1976d2; }
+        .status { font-size: 1.1em; margin: 18px 0; }
+        .ok { color: #388e3c; }
+        .fail { color: #d32f2f; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Состояние сервера</h2>
+        <div id="status"></div>
+    </div>
+    <script>
+        async function loadStatus() {
+            const res = await fetch('/status');
+            const data = await res.json();
+            let html = "";
+            html += `<div class="status">Модель: <span class="${data.model_loaded ? 'ok':'fail'}">${data.model_loaded ? 'загружена' : 'не загружена'}</span></div>`;
+            html += `<div class="status">Vosk: <span class="${data.vosk_model ? 'ok':'fail'}">${data.vosk_model ? 'найдена' : 'не найдена'}</span></div>`;
+            html += `<div class="status">RadioML: <span class="${data.radioml_dataset ? 'ok':'fail'}">${data.radioml_dataset ? 'найден' : 'не найден'}</span></div>`;
+            html += `<div class="status">Ошибки: <span class="${data.errors ? 'fail':'ok'}">${data.errors || 'нет'}</span></div>`;
+            document.getElementById('status').innerHTML = html;
+        }
+        loadStatus();
+    </script>
+</body>
+</html>

@@ -18,6 +18,7 @@ from pydub import AudioSegment
 from vosk import Model, KaldiRecognizer
 import wave
 import json
+import subprocess
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -283,6 +284,77 @@ def update_settings(new_settings: dict):
 def settings_ui():
     return FileResponse("backend/settings.html")
 
+@app.get("/logs_ui", response_class=HTMLResponse)
+def logs_ui():
+    return FileResponse("backend/logs_ui.html")
+
+@app.get("/upload_ui", response_class=HTMLResponse)
+def upload_ui():
+    return FileResponse("backend/upload_ui.html")
+
+@app.get("/logs")
+def get_logs():
+    log_path = "backend/app.log"
+    if not os.path.exists(log_path):
+        return "Лог-файл не найден."
+    with open(log_path, "r", encoding="utf-8") as f:
+        return f.read()[-10000:]  # последние 10к символов
+
+@app.get("/status_ui", response_class=HTMLResponse)
+def status_ui():
+    return FileResponse("backend/status_ui.html")
+
+@app.get("/status")
+def status():
+    # Пример проверки состояния
+    model_loaded = os.path.exists("backend/signal_model.pth")
+    vosk_model = os.path.exists(config.get("vosk_model_path", "backend/vosk-model-ru"))
+    radioml_dataset = os.path.exists(config.get("radioml_dataset_path", "backend/radioml2018/RML2018.01A.h5"))
+    errors = ""
+    return {
+        "model_loaded": model_loaded,
+        "vosk_model": vosk_model,
+        "radioml_dataset": radioml_dataset,
+        "errors": errors
+    }
+
+@app.get("/", response_class=HTMLResponse)
+def root():
+    return """
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <title>Radio Decoder Starter</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4f8; margin: 0; }
+            .container { background: #fff; max-width: 520px; margin: 40px auto; padding: 36px 28px 28px 28px; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.10);}
+            h1 { text-align: center; color: #1976d2; margin-bottom: 24px; }
+            ul { list-style: none; padding: 0; }
+            li { margin: 18px 0; }
+            a, button { display: block; width: 100%; text-align: center; background: #1976d2; color: #fff; text-decoration: none; padding: 14px 0; border-radius: 8px; font-size: 1.1em; margin-bottom: 10px; border: none; cursor: pointer; transition: background 0.2s;}
+            a:hover, button:hover { background: #125ea8; }
+            .desc { text-align: center; color: #555; margin-bottom: 24px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Radio Decoder Starter</h1>
+            <div class="desc">Многофункциональный сервис для анализа радиосигналов и работы с ИИ</div>
+            <ul>
+                <li><a href="/settings_ui">⚙️ Управление настройками</a></li>
+                <li><a href="/docs">📚 Документация API (Swagger)</a></li>
+                <li><a href="/upload_ui">⬆️ Загрузка новых сигналов</a></li>
+                <li><a href="/logs_ui">📝 Просмотр логов</a></li>
+                <li><a href="/status_ui">📊 Состояние сервера</a></li>
+                <li><button onclick="fetch('/train_model', {method: 'POST'}).then(()=>alert('Обучение запущено!'));">🚀 Обучить модель</button></li>
+            </ul>
+        </div>
+    </body>
+    </html>
+    """
+
 if config.get("use_anomaly_detector", False):
     # использовать config["anomaly_threshold"] при обработке
     pass
@@ -290,3 +362,9 @@ if config.get("use_anomaly_detector", False):
 if config.get("use_speech_recognition", False):
     # включить/выключить распознавание речи
     pass
+
+@app.post("/train_model")
+def train_model():
+    # Запуск обучения в фоне (можно доработать под вашу ОС)
+    subprocess.Popen(["python3", "backend/train_signal_model.py"])
+    return {"status": "training started"}

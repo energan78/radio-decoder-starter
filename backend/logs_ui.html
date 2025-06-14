@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Логи Radio Decoder</title>
+    <style>
+        body { font-family: monospace; background: #222; color: #eee; margin: 0; }
+        .container { max-width: 800px; margin: 30px auto; background: #181818; border-radius: 10px; padding: 24px; }
+        h2 { color: #90caf9; }
+        pre { background: #111; color: #b9f; padding: 16px; border-radius: 8px; overflow-x: auto; }
+        button { background: #1976d2; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-size: 1em; cursor: pointer; margin-bottom: 18px;}
+        button:hover { background: #125ea8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Логи Radio Decoder</h2>
+        <button onclick="loadLogs()">Обновить</button>
+        <pre id="log"></pre>
+    </div>
+    <script>
+        async function loadLogs() {
+            const res = await fetch('/logs');
+            document.getElementById('log').textContent = await res.text();
+        }
+        loadLogs();
+    </script>
+</body>
+</html>

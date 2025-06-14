@@ -1,9 +1,14 @@
 fastapi
 uvicorn
-python-multipart
-requests
-httpx
 aiofiles
+pydantic
 numpy
 torch
+scikit-learn
+h5py
+joblib
+SpeechRecognition
+pydub
+vosk
 pytest
+python-multipart
