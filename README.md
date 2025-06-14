@@ -86,6 +86,8 @@ python3 backend/train_signal_model.py
 ## Запуск сервера
 
 ```bash
+cd ~/radio-decoder-starter
+
 uvicorn backend.main:app --reload
 ```
 
