@@ -2,7 +2,7 @@ import os
 import json
 import re
 import logging
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Form
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from pydantic import BaseModel, HttpUrl
 import httpx
@@ -19,6 +19,7 @@ from vosk import Model, KaldiRecognizer
 import wave
 import json
 import subprocess
+from backend.signal_utils import load_signal
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -161,18 +162,27 @@ class AddSignalRequest(BaseModel):
     signal_type: str
 
 @app.post("/add_signal", summary="Добавить пример сигнала в библиотеку")
-async def add_signal(request: AddSignalRequest, file: UploadFile = File(...)):
-    try:
-        class_dir = os.path.join(SIGNAL_LIBRARY_PATH, request.signal_type)
-        os.makedirs(class_dir, exist_ok=True)
-        file_path = os.path.join(class_dir, file.filename)
-        async with aiofiles.open(file_path, "wb") as f:
-            await f.write(await file.read())
-        logger.info(f"Файл {file.filename} добавлен в класс {request.signal_type}")
-        return {"message": f"Файл добавлен в класс {request.signal_type}"}
-    except Exception as e:
-        logger.error(f"Ошибка добавления сигнала: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка добавления сигнала")
+async def add_signal(
+    file: UploadFile = File(...),
+    signal_type: str = Form(...),
+    comment: str = Form(None)
+):
+    save_dir = f"backend/signal_library/{signal_type}"
+    os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, file.filename)
+    with open(save_path, "wb") as f_out:
+        f_out.write(await file.read())
+    # Сохраняем комментарий, если есть
+    if comment:
+        with open(save_path + ".txt", "w", encoding="utf-8") as f_comment:
+            f_comment.write(comment)
+    from backend.signal_utils import load_signal
+    data = load_signal(save_path)
+    info = {
+        "length": len(data),
+        "dtype": str(data.dtype)
+    }
+    return {"status": "ok", "info": info}
 
 VOSK_MODEL_PATH = "backend/vosk-model-ru"
 
@@ -268,6 +278,56 @@ async def recognize_speech_offline(file: UploadFile = File(...)):
         logger.error(f"Ошибка офлайн-распознавания речи: {e}")
         raise HTTPException(status_code=500, detail="Ошибка офлайн-распознавания речи")
 
+@app.post("/analyze_signal")
+async def analyze_signal(
+    file: UploadFile = File(...),
+    signal_type: str = Form(...),
+    comment: str = Form(None)
+):
+    # Сохраняем временно
+    temp_path = f"backend/temp/{file.filename}"
+    os.makedirs(os.path.dirname(temp_path), exist_ok=True)
+    with open(temp_path, "wb") as f_out:
+        f_out.write(await file.read())
+    data = load_signal(temp_path)
+    info = {
+        "length": len(data),
+        "dtype": str(data.dtype)
+    }
+    # Пример: вычисление спектра
+    spectrum = np.abs(np.fft.fft(data[:2048]))  # первые 2048 точек
+    spectrum = (spectrum / spectrum.max()).tolist()
+    # Пример: классификация (если модель загружена)
+    prediction = None
+    try:
+        from backend.train_signal_model import ConvSignalNet, SAMPLE_LEN
+        import torch
+        model_data = torch.load("backend/signal_model.pth", map_location="cpu")
+        model = ConvSignalNet(num_classes=len(model_data["classes"]))
+        model.load_state_dict(model_data["model_state"])
+        model.eval()
+        x = np.abs(data[:SAMPLE_LEN]).astype(np.float32)
+        x = torch.tensor(x).unsqueeze(0)
+        out = model(x)
+        pred_idx = out.argmax(dim=1).item()
+        prediction = model_data["classes"][pred_idx]
+        info["prediction"] = prediction
+    except Exception:
+        pass
+    # Пример: аномалия (если есть модель)
+    anomaly = None
+    try:
+        import joblib
+        if os.path.exists("backend/anomaly_model.pkl"):
+            anomaly_model = joblib.load("backend/anomaly_model.pkl")
+            X = np.abs(data[:1024]).reshape(1, -1)
+            pred = anomaly_model.predict(X)[0]
+            anomaly = pred == -1
+            info["anomaly"] = anomaly
+    except Exception:
+        pass
+    return {"info": info, "spectrum": spectrum}
+
 @app.get("/settings")
 def get_settings():
     return config
@@ -304,6 +364,10 @@ def get_logs():
 def status_ui():
     return FileResponse("backend/status_ui.html")
 
+@app.get("/signal_ui", response_class=HTMLResponse)
+def signal_ui():
+    return FileResponse("backend/signal_ui.html")
+
 @app.get("/status")
 def status():
     # Пример проверки состояния
@@ -326,9 +390,8 @@ def root():
     <head>
         <meta charset="UTF-8">
         <title>Radio Decoder Starter</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
-            body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4f8; margin: 0; }
+            body { font-family: Arial, sans-serif; background: #f0f4f8; }
             .container { background: #fff; max-width: 520px; margin: 40px auto; padding: 36px 28px 28px 28px; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.10);}
             h1 { text-align: center; color: #1976d2; margin-bottom: 24px; }
             ul { list-style: none; padding: 0; }
@@ -345,10 +408,10 @@ def root():
             <ul>
                 <li><a href="/settings_ui">⚙️ Управление настройками</a></li>
                 <li><a href="/docs">📚 Документация API (Swagger)</a></li>
+                <li><a href="/signal_ui">🎛 Работа с сигналом</a></li>
                 <li><a href="/upload_ui">⬆️ Загрузка новых сигналов</a></li>
                 <li><a href="/logs_ui">📝 Просмотр логов</a></li>
                 <li><a href="/status_ui">📊 Состояние сервера</a></li>
-                <li><button onclick="fetch('/train_model', {method: 'POST'}).then(()=>alert('Обучение запущено!'));">🚀 Обучить модель</button></li>
             </ul>
         </div>
     </body>

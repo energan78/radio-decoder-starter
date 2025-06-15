@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Работа с сигналом</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f4f8; }
+        .container { background: #fff; max-width: 600px; margin: 40px auto; padding: 32px 24px 24px 24px; border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,0.10);}
+        h2 { text-align: center; color: #1976d2; }
+        label { display: block; margin: 18px 0 8px 0; }
+        input[type="file"], input[type="text"], textarea { width: 100%; }
+        button { background: #1976d2; color: #fff; border: none; padding: 10px 24px; border-radius: 6px; font-size: 1em; cursor: pointer; margin-top: 18px; width: 100%; }
+        button:hover { background: #125ea8; }
+        #status { margin-top: 18px; text-align: center; font-weight: bold; }
+        .success { color: #388e3c; }
+        .error { color: #d32f2f; }
+        #spectrum { width: 100%; height: 240px; margin-top: 18px; background: #222; }
+        .info-block { background: #f7f7f7; border-radius: 8px; padding: 10px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Работа с сигналом</h2>
+        <form id="signalForm">
+            <label>Файл сигнала:</label>
+            <input type="file" id="file" name="file" required />
+            <label>Тип сигнала (например, FM, AM):</label>
+            <input type="text" id="signal_type" name="signal_type" required />
+            <label>Комментарий:</label>
+            <textarea id="comment" name="comment" rows="2"></textarea>
+            <button type="submit">Загрузить и проанализировать</button>
+        </form>
+        <div id="status"></div>
+        <div class="info-block" id="signalInfo"></div>
+        <canvas id="spectrum"></canvas>
+        <button id="saveBtn" style="display:none;">Сохранить в библиотеку</button>
+    </div>
+    <script>
+        let lastFile = null;
+        let lastType = "";
+        let lastComment = "";
+
+        document.getElementById('signalForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const file = document.getElementById('file').files[0];
+            const signal_type = document.getElementById('signal_type').value;
+            const comment = document.getElementById('comment').value;
+            if (!file) return;
+            lastFile = file;
+            lastType = signal_type;
+            lastComment = comment;
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('signal_type', signal_type);
+            formData.append('comment', comment);
+            document.getElementById('status').textContent = "Загрузка...";
+            const res = await fetch('/analyze_signal', { method: 'POST', body: formData });
+            if (res.ok) {
+                const data = await res.json();
+                showInfo(data.info);
+                drawSpectrum(data.spectrum);
+                document.getElementById('status').textContent = "Сигнал загружен и проанализирован!";
+                document.getElementById('status').className = "success";
+                document.getElementById('saveBtn').style.display = "block";
+            } else {
+                document.getElementById('status').textContent = "Ошибка анализа!";
+                document.getElementById('status').className = "error";
+            }
+        };
+
+        document.getElementById('saveBtn').onclick = async function() {
+            if (!lastFile) return;
+            const formData = new FormData();
+            formData.append('file', lastFile);
+            formData.append('signal_type', lastType);
+            formData.append('comment', lastComment);
+            const res = await fetch('/add_signal', { method: 'POST', body: formData });
+            if (res.ok) {
+                document.getElementById('status').textContent = "Сигнал сохранён в библиотеку!";
+                document.getElementById('status').className = "success";
+            } else {
+                document.getElementById('status').textContent = "Ошибка сохранения!";
+                document.getElementById('status').className = "error";
+            }
+        };
+
+        function showInfo(info) {
+            let html = `<b>Длина:</b> ${info.length}<br>`;
+            html += `<b>Тип данных:</b> ${info.dtype}<br>`;
+            if (info.prediction) html += `<b>Класс по модели:</b> ${info.prediction}<br>`;
+            if (info.anomaly !== undefined) html += `<b>Аномалия:</b> ${info.anomaly ? "Да" : "Нет"}<br>`;
+            document.getElementById('signalInfo').innerHTML = html;
+        }
+
+        function drawSpectrum(spectrum) {
+            const canvas = document.getElementById('spectrum');
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (!spectrum) return;
+            ctx.strokeStyle = "#90caf9";
+            ctx.beginPath();
+            for (let i = 0; i < spectrum.length; i++) {
+                const x = i * canvas.width / spectrum.length;
+                const y = canvas.height - (spectrum[i] * canvas.height);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+    </script>
+</body>
+</html>

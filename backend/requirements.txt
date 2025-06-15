@@ -12,3 +12,4 @@ pydub
 vosk
 pytest
 python-multipart
+soundfile

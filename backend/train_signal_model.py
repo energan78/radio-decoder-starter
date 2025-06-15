@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
 import h5py
+from backend.signal_utils import load_signal
 
 SIGNAL_LIBRARY_PATH = "backend/signal_library"
 RADIOML2018_PATH = "backend/radioml2018/RML2018.01A.h5"
@@ -32,7 +33,7 @@ class SignalDataset(Dataset):
         # 2. Данные RadioML 2018.01A
         if radioml2018_path and os.path.exists(radioml2018_path):
             with h5py.File(radioml2018_path, 'r') as f:
-                X = f['X']  # НЕ ставьте [:]!
+                X = f['X']  # Только ссылка на данные, не загружает всё в память
                 Y = f['Y']
                 mods = [f['classes'][i].decode() for i in range(f['classes'].shape[0])] if 'classes' in f else [str(i) for i in range(Y.shape[1])]
                 for i in range(X.shape[0]):
@@ -52,7 +53,7 @@ class SignalDataset(Dataset):
     def __getitem__(self, idx):
         sample, label = self.samples[idx]
         if isinstance(sample, str):
-            data = np.fromfile(sample, dtype=np.complex64)
+            data = load_signal(sample)
         else:
             data = sample
         data = np.abs(data)
@@ -133,11 +134,3 @@ def train():
 if __name__ == "__main__":
     train()
 
-import h5py
-import numpy as np
-
-with h5py.File("backend/radioml2018/GOLD_XYZ_OSC.0001_1024.hdf5", "r") as f:
-    X = f['X'][:]  # (num_samples, 2, 1024)
-    Y = f['Y'][:]  # (num_samples, num_classes)
-    classes = [c.decode() for c in f['classes'][:]]
-    print(X.shape, Y.shape, classes)
