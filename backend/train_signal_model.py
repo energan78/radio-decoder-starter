@@ -34,7 +34,7 @@ class SignalDataset(Dataset):
             with h5py.File(radioml2018_path, 'r') as f:
                 X = f['X'][:]  # (num_samples, 2, 1024)
                 Y = f['Y'][:]  # (num_samples, num_classes)
-                mods = [m.decode() for m in f['classes'][:]]
+                mods = [f['classes'][i].decode() for i in range(f['classes'].shape[0])] if 'classes' in f else [str(i) for i in range(Y.shape[1])]
                 for i in range(X.shape[0]):
                     mod_idx = np.argmax(Y[i])
                     mod = mods[mod_idx]
@@ -132,3 +132,12 @@ def train():
 
 if __name__ == "__main__":
     train()
+
+import h5py
+import numpy as np
+
+with h5py.File("backend/radioml2018/GOLD_XYZ_OSC.0001_1024.hdf5", "r") as f:
+    X = f['X'][:]  # (num_samples, 2, 1024)
+    Y = f['Y'][:]  # (num_samples, num_classes)
+    classes = [c.decode() for c in f['classes'][:]]
+    print(X.shape, Y.shape, classes)
