@@ -5,7 +5,9 @@
   "use_geo_classifier": true,
   "use_speech_recognition": true,
   "use_sentiment_analysis": false,
-  "radioml_dataset_path": "backend/radioml2018/RML2018.01A.h5",
-  "vosk_model_path": "backend/vosk-model-ru"
+  "radioml_dataset_path": "backend/radioml2018/radioml2018/RML2018.01A.h5",
+  "vosk_model_path": "backend/vosk-model-ru",
+  "git_instructions": {
+  
 }
 
