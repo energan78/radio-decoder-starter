@@ -32,8 +32,8 @@ class SignalDataset(Dataset):
         # 2. Данные RadioML 2018.01A
         if radioml2018_path and os.path.exists(radioml2018_path):
             with h5py.File(radioml2018_path, 'r') as f:
-                X = f['X'][:]  # (num_samples, 2, 1024)
-                Y = f['Y'][:]  # (num_samples, num_classes)
+                X = f['X']  # НЕ ставьте [:]!
+                Y = f['Y']
                 mods = [f['classes'][i].decode() for i in range(f['classes'].shape[0])] if 'classes' in f else [str(i) for i in range(Y.shape[1])]
                 for i in range(X.shape[0]):
                     mod_idx = np.argmax(Y[i])
