@@ -105,25 +105,35 @@
                 }
                 document.getElementById('mlResult').innerHTML = mlHtml;
 
-                // RF
+                // Random Forest
                 let rfHtml = "";
-                if (data.rf_pred) rfHtml += `<b>RandomForest:</b> ${data.rf_pred}<br>`;
-                if (data.rf_probs && data.classes) {
-                    rfHtml += `<b>Вероятности:</b> ${data.rf_probs.map((p,i)=>`${data.classes[i]}: ${p.toFixed(2)}`).join(", ")}<br>`;
+                if (data.rf_pred) {
+                    rfHtml += `<b>RandomForest:</b> ${data.rf_pred}<br>`;
+                    if (data.rf_probs && data.classes) {
+                        rfHtml += `<b>Вероятности:</b> ${data.rf_probs.map((p,i)=>`${data.classes[i]}: ${p.toFixed(2)}`).join(", ")}<br>`;
+                    }
+                } else {
+                    rfHtml = "<i>RandomForest: нет данных (модель не загружена или не обучена)</i>";
                 }
                 document.getElementById('rfResult').innerHTML = rfHtml;
 
                 // SVM
                 let svmHtml = "";
-                if (data.svm_pred) svmHtml += `<b>SVM:</b> ${data.svm_pred}<br>`;
-                if (data.svm_probs && data.classes) {
-                    svmHtml += `<b>Вероятности:</b> ${data.svm_probs.map((p,i)=>`${data.classes[i]}: ${p.toFixed(2)}`).join(", ")}<br>`;
+                if (data.svm_pred) {
+                    svmHtml += `<b>SVM:</b> ${data.svm_pred}<br>`;
+                    if (data.svm_probs && data.classes) {
+                        svmHtml += `<b>Вероятности:</b> ${data.svm_probs.map((p,i)=>`${data.classes[i]}: ${p.toFixed(2)}`).join(", ")}<br>`;
+                    }
+                } else {
+                    svmHtml = "<i>SVM: нет данных (модель не загружена или не обучена)</i>";
                 }
                 document.getElementById('svmResult').innerHTML = svmHtml;
 
                 // Аномалия
                 if (data.anomaly !== undefined) {
                     document.getElementById('anomalyResult').innerHTML = `<b>Аномалия:</b> ${data.anomaly ? "Да" : "Нет"}`;
+                } else {
+                    document.getElementById('anomalyResult').innerHTML = "<i>Анализ аномалий недоступен</i>";
                 }
 
                 // Vosk
