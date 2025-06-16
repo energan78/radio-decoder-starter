@@ -2,7 +2,7 @@ import os
 import json
 import re
 import logging
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Form, Body
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from pydantic import BaseModel, HttpUrl
 import httpx
@@ -19,10 +19,13 @@ from vosk import Model, KaldiRecognizer
 import wave
 import json
 import subprocess
-from backend.signal_utils import load_signal, get_class_stats, extract_freq_from_filename
-import joblib
-from backend.analyzer import analyze_signal_file
+from backend.signal_utils import (
+    load_signal, extract_freq_from_filename, get_class_stats, create_class_folder
+)
 from backend.match_freq_band import match_frequency
+from fastapi import Body
+from backend.analyzer import analyze_signal_file
+import joblib
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -287,6 +290,16 @@ async def recognize_speech_offline(file: UploadFile = File(...)):
         logger.error(f"Ошибка офлайн-распознавания речи: {e}")
         raise HTTPException(status_code=500, detail="Ошибка офлайн-распознавания речи")
 
+@app.get("/signal_classes")
+def signal_classes():
+    stats = get_class_stats()
+    return {"classes": list(stats.keys())}
+
+@app.post("/create_class_folder")
+def create_class_folder_api(class_name: str = Body(..., embed=True)):
+    create_class_folder(class_name)
+    return {"status": "ok"}
+
 @app.post("/analyze_signal")
 async def analyze_signal(
     file: UploadFile = File(...),
@@ -318,7 +331,7 @@ async def analyze_signal(
         "label": band_info["label"] if band_info else None,
         "modulation": band_info["modulation"] if band_info else None,
         "usage": band_info["usage"] if band_info else None,
-        "comment": comment_auto,
+        "comment_auto": comment_auto,
     }
 
 @app.get("/settings")

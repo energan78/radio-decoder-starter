@@ -26,8 +26,10 @@
         <form id="signalForm">
             <label>Файл сигнала:</label>
             <input type="file" id="file" name="file" required />
-            <label>Тип сигнала (например, FM, AM):</label>
-            <input type="text" id="signal_type" name="signal_type" required />
+            <label>Тип сигнала (папка):</label>
+            <select id="signal_type" name="signal_type"></select>
+            <input type="text" id="new_class" placeholder="Новый класс">
+            <button type="button" onclick="addNewClass()">Добавить класс</button>
             <label>Комментарий:</label>
             <textarea id="comment" name="comment" rows="2"></textarea>
             <button type="submit">Загрузить и проанализировать</button>
@@ -53,6 +55,11 @@
         <canvas id="confusion" width="400" height="400"></canvas>
 
         <button id="saveBtn" style="display:none;">Сохранить в библиотеку</button>
+
+        <!-- Новая категория -->
+        <h3>Добавить новую категорию</h3>
+        <input type="text" id="new_class" placeholder="Название новой категории" />
+        <button id="addClassBtn">Добавить категорию</button>
     </div>
     <script>
         let lastFile = null;
@@ -78,8 +85,9 @@
                 if (data.label) infoHtml += `<b>Диапазон:</b> ${data.label}<br>`;
                 if (data.modulation) infoHtml += `<b>Модуляция:</b> ${data.modulation}<br>`;
                 if (data.usage) infoHtml += `<b>Назначение:</b> ${data.usage}<br>`;
-                if (data.comment) infoHtml += `<b>Комментарий:</b> ${data.comment}<br>`;
+                if (data.comment_auto) infoHtml += `<b>Авто-комментарий:</b> ${data.comment_auto}<br>`;
                 document.getElementById('signalInfo').innerHTML = infoHtml;
+                document.getElementById('comment').value = data.comment_auto || "";
                 document.getElementById('status').textContent = "Сигнал загружен и проанализирован!";
                 document.getElementById('status').className = "success";
                 // Визуализация
@@ -121,6 +129,34 @@
                 document.getElementById('status').className = "error";
             }
         };
+
+        async function loadSignalClasses() {
+            const res = await fetch('/signal_classes');
+            if (res.ok) {
+                const data = await res.json();
+                const select = document.getElementById('signal_type');
+                select.innerHTML = "";
+                data.classes.forEach(cls => {
+                    const option = document.createElement('option');
+                    option.value = cls;
+                    option.textContent = cls;
+                    select.appendChild(option);
+                });
+            }
+        }
+        window.onload = loadSignalClasses;
+
+        async function addNewClass() {
+            const newClass = document.getElementById('new_class').value.trim();
+            if (!newClass) return;
+            await fetch('/create_class_folder', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({class_name: newClass})
+            });
+            loadSignalClasses();
+            document.getElementById('new_class').value = "";
+        }
 
         function showInfo(info) {
             let html = `<b>Длина:</b> ${info.length}<br>`;
@@ -217,6 +253,21 @@
                 }
             }
         }
+        async function loadSignalClasses() {
+            const res = await fetch('/signal_classes');
+            if (res.ok) {
+                const data = await res.json();
+                const select = document.getElementById('signal_type');
+                select.innerHTML = "";
+                data.classes.forEach(cls => {
+                    const option = document.createElement('option');
+                    option.value = cls;
+                    option.textContent = cls;
+                    select.appendChild(option);
+                });
+            }
+        }
+        window.onload = loadSignalClasses;
     </script>
 </body>
 </html>

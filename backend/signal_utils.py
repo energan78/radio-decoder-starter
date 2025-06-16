@@ -38,7 +38,6 @@ def get_class_stats(base_dir="backend/signal_library"):
     """
     Возвращает словарь: {класс: количество файлов}
     """
-    import os
     stats = {}
     for class_name in sorted(os.listdir(base_dir)):
         class_dir = os.path.join(base_dir, class_name)
@@ -47,3 +46,7 @@ def get_class_stats(base_dir="backend/signal_library"):
         count = len([f for f in os.listdir(class_dir) if f.endswith((".npy", ".wav", ".bin", ".raw"))])
         stats[class_name] = count
     return stats
+
+def create_class_folder(class_name, base_dir="backend/signal_library"):
+    class_dir = os.path.join(base_dir, class_name)
+    os.makedirs(class_dir, exist_ok=True)
