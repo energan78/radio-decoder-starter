@@ -283,6 +283,13 @@ async def analyze_signal(
     signal_type: str = Form(...),
     comment: str = Form(None)
 ):
+    """
+    Анализирует загруженный сигнал:
+    - строит временной ряд и спектр
+    - классифицирует с помощью модели (если есть)
+    - возвращает вероятности, активации слоёв, матрицу неточностей
+    """
+    # Сохраняем временный файл
     temp_path = f"backend/temp/{file.filename}"
     os.makedirs(os.path.dirname(temp_path), exist_ok=True)
     with open(temp_path, "wb") as f_out:
@@ -386,6 +393,9 @@ def status_ui():
 
 @app.get("/signal_ui", response_class=HTMLResponse)
 def signal_ui():
+    """
+    Возвращает HTML-страницу для работы с сигналом.
+    """
     return FileResponse("backend/signal_ui.html")
 
 @app.get("/status")

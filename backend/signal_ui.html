@@ -22,6 +22,7 @@
 <body>
     <div class="container">
         <h2>Работа с сигналом</h2>
+        <!-- Форма для загрузки сигнала -->
         <form id="signalForm">
             <label>Файл сигнала:</label>
             <input type="file" id="file" name="file" required />
@@ -34,11 +35,11 @@
         <div id="status"></div>
         <div class="info-block" id="signalInfo"></div>
 
-        <!-- Временной ряд -->
+        <!-- График временного ряда -->
         <h3>Временной ряд</h3>
         <canvas id="waveform" width="600" height="180"></canvas>
 
-        <!-- Спектр -->
+        <!-- График спектра -->
         <h3>Спектр</h3>
         <canvas id="spectrum" width="600" height="180"></canvas>
 
@@ -116,7 +117,9 @@
             document.getElementById('signalInfo').innerHTML = html;
         }
 
+        <!-- JS: функция отрисовки временного ряда -->
         function drawWaveform(data) {
+            // Рисует временной ряд сигнала на canvas
             const canvas = document.getElementById('waveform');
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);

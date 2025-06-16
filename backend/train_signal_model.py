@@ -14,11 +14,14 @@ MODEL_PATH = "backend/signal_model.pth"
 SAMPLE_LEN = 1024
 
 class SignalDataset(Dataset):
+    """
+    Класс PyTorch Dataset для работы с сигналами из собственной библиотеки и RadioML.
+    """
     def __init__(self, root_dir, sample_len=1024, radioml2018_path=None):
-        self.samples = []
-        self.labels = []
-        self.classes = []
-        self.class_to_idx = {}
+        # self.samples — список (путь к файлу или массив, метка)
+        # self.class_to_idx — словарь: класс -> индекс
+        # self.classes — список имён классов
+        # ...дальше по коду...
 
         # 1. Собственные данные
         if os.path.exists(root_dir):
@@ -51,6 +54,10 @@ class SignalDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, idx):
+        """
+        Возвращает (тензор данных, метка) для PyTorch DataLoader.
+        Если сигнал короче sample_len — дополняет нулями, если длиннее — обрезает.
+        """
         sample, label = self.samples[idx]
         if isinstance(sample, str):
             data = load_signal(sample)
