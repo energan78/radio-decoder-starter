@@ -172,7 +172,6 @@ async def add_signal(
     save_path = os.path.join(save_dir, file.filename)
     with open(save_path, "wb") as f_out:
         f_out.write(await file.read())
-    # Сохраняем комментарий, если есть
     if comment:
         with open(save_path + ".txt", "w", encoding="utf-8") as f_comment:
             f_comment.write(comment)
@@ -284,7 +283,6 @@ async def analyze_signal(
     signal_type: str = Form(...),
     comment: str = Form(None)
 ):
-    # Сохраняем временно
     temp_path = f"backend/temp/{file.filename}"
     os.makedirs(os.path.dirname(temp_path), exist_ok=True)
     with open(temp_path, "wb") as f_out:
@@ -294,11 +292,10 @@ async def analyze_signal(
         "length": len(data),
         "dtype": str(data.dtype)
     }
-    # Пример: вычисление спектра
-    spectrum = np.abs(np.fft.fft(data[:2048]))  # первые 2048 точек
-    spectrum = (spectrum / spectrum.max()).tolist()
-    # Пример: классификация (если модель загружена)
-    prediction = None
+    waveform = (data[:1024] / np.max(np.abs(data[:1024]))).tolist()
+    spectrum = (np.abs(np.fft.fft(data[:1024])) / np.max(np.abs(np.fft.fft(data[:1024])))).tolist()
+    # Классификация и вероятности
+    prediction, probs, classes = None, None, None
     try:
         from backend.train_signal_model import ConvSignalNet, SAMPLE_LEN
         import torch
@@ -309,24 +306,47 @@ async def analyze_signal(
         x = np.abs(data[:SAMPLE_LEN]).astype(np.float32)
         x = torch.tensor(x).unsqueeze(0)
         out = model(x)
-        pred_idx = out.argmax(dim=1).item()
+        probs = torch.softmax(out, dim=1).detach().cpu().numpy()[0].tolist()
+        pred_idx = int(np.argmax(probs))
         prediction = model_data["classes"][pred_idx]
+        classes = model_data["classes"]
         info["prediction"] = prediction
     except Exception:
         pass
-    # Пример: аномалия (если есть модель)
-    anomaly = None
+    # Активации слоёв
+    activations = {}
     try:
-        import joblib
-        if os.path.exists("backend/anomaly_model.pkl"):
-            anomaly_model = joblib.load("backend/anomaly_model.pkl")
-            X = np.abs(data[:1024]).reshape(1, -1)
-            pred = anomaly_model.predict(X)[0]
-            anomaly = pred == -1
-            info["anomaly"] = anomaly
+        import torch
+        acts = {}
+        def hook_fn(name):
+            def hook(module, input, output):
+                acts[name] = output.detach().cpu().numpy()
+            return hook
+        for name, layer in model.named_modules():
+            if isinstance(layer, torch.nn.Conv1d):
+                layer.register_forward_hook(hook_fn(name))
+        model(x)
+        for k, v in acts.items():
+            activations[k] = v[0][:4, :128].tolist()  # первые 4 карты, 128 точек
     except Exception:
         pass
-    return {"info": info, "spectrum": spectrum}
+    # Матрица неточностей
+    confusion_matrix = None
+    try:
+        if os.path.exists("backend/confusion_matrix.npy"):
+            confusion_matrix = np.load("backend/confusion_matrix.npy").tolist()
+    except Exception:
+        pass
+    return {
+        "info": info,
+        "waveform": waveform,
+        "spectrum": spectrum,
+        "prediction": prediction,
+        "probs": probs,
+        "classes": classes,
+        "activations": activations,
+        "confusion_matrix": confusion_matrix
+    }
 
 @app.get("/settings")
 def get_settings():

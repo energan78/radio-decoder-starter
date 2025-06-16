@@ -7,6 +7,7 @@
         body { font-family: Arial, sans-serif; background: #f0f4f8; }
         .container { background: #fff; max-width: 600px; margin: 40px auto; padding: 32px 24px 24px 24px; border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,0.10);}
         h2 { text-align: center; color: #1976d2; }
+        h3 { color: #1976d2; margin-top: 24px; }
         label { display: block; margin: 18px 0 8px 0; }
         input[type="file"], input[type="text"], textarea { width: 100%; }
         button { background: #1976d2; color: #fff; border: none; padding: 10px 24px; border-radius: 6px; font-size: 1em; cursor: pointer; margin-top: 18px; width: 100%; }
@@ -14,7 +15,7 @@
         #status { margin-top: 18px; text-align: center; font-weight: bold; }
         .success { color: #388e3c; }
         .error { color: #d32f2f; }
-        #spectrum { width: 100%; height: 240px; margin-top: 18px; background: #222; }
+        canvas { width: 100%; height: auto; margin-top: 18px; background: #222; border-radius: 8px; }
         .info-block { background: #f7f7f7; border-radius: 8px; padding: 10px; margin-top: 10px; }
     </style>
 </head>
@@ -32,7 +33,27 @@
         </form>
         <div id="status"></div>
         <div class="info-block" id="signalInfo"></div>
-        <canvas id="spectrum"></canvas>
+
+        <!-- Временной ряд -->
+        <h3>Временной ряд</h3>
+        <canvas id="waveform" width="600" height="180"></canvas>
+
+        <!-- Спектр -->
+        <h3>Спектр</h3>
+        <canvas id="spectrum" width="600" height="180"></canvas>
+
+        <!-- Вероятности по классам -->
+        <h3>Вероятности по классам</h3>
+        <canvas id="probs" width="600" height="180"></canvas>
+
+        <!-- Активации слоёв -->
+        <h3>Активации сверточных слоёв</h3>
+        <div id="activations"></div>
+
+        <!-- Матрица неточностей -->
+        <h3>Матрица неточностей</h3>
+        <canvas id="confusion" width="400" height="400"></canvas>
+
         <button id="saveBtn" style="display:none;">Сохранить в библиотеку</button>
     </div>
     <script>
@@ -57,8 +78,11 @@
             const res = await fetch('/analyze_signal', { method: 'POST', body: formData });
             if (res.ok) {
                 const data = await res.json();
-                showInfo(data.info);
+                drawWaveform(data.waveform);
                 drawSpectrum(data.spectrum);
+                if (data.probs && data.classes) drawProbs(data.probs, data.classes);
+                if (data.confusion_matrix && data.classes) drawConfusion(data.confusion_matrix, data.classes);
+                if (data.activations) drawActivations(data.activations);
                 document.getElementById('status').textContent = "Сигнал загружен и проанализирован!";
                 document.getElementById('status').className = "success";
                 document.getElementById('saveBtn').style.display = "block";
@@ -92,14 +116,25 @@
             document.getElementById('signalInfo').innerHTML = html;
         }
 
+        function drawWaveform(data) {
+            const canvas = document.getElementById('waveform');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = "#1976d2";
+            ctx.beginPath();
+            for (let i = 0; i < data.length; i++) {
+                const x = i * canvas.width / data.length;
+                const y = canvas.height/2 - (data[i] * canvas.height/2);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
         function drawSpectrum(spectrum) {
             const canvas = document.getElementById('spectrum');
             const ctx = canvas.getContext('2d');
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if (!spectrum) return;
-            ctx.strokeStyle = "#90caf9";
+            ctx.strokeStyle = "#388e3c";
             ctx.beginPath();
             for (let i = 0; i < spectrum.length; i++) {
                 const x = i * canvas.width / spectrum.length;
@@ -108,6 +143,63 @@
                 else ctx.lineTo(x, y);
             }
             ctx.stroke();
+        }
+        function drawProbs(probs, classes) {
+            const canvas = document.getElementById('probs');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const barWidth = canvas.width / probs.length;
+            for (let i = 0; i < probs.length; i++) {
+                ctx.fillStyle = "#1976d2";
+                ctx.fillRect(i * barWidth, canvas.height - probs[i]*canvas.height, barWidth*0.8, probs[i]*canvas.height);
+                ctx.fillStyle = "#000";
+                ctx.fillText(classes[i], i * barWidth + 5, canvas.height - 5);
+            }
+        }
+        function drawConfusion(matrix, classes) {
+            const canvas = document.getElementById('confusion');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const n = matrix.length;
+            const cell = canvas.width / n;
+            for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+                const val = matrix[i][j];
+                const max = Math.max(...matrix.flat());
+                const color = `rgba(25, 118, 210, ${val/max})`;
+                ctx.fillStyle = color;
+                ctx.fillRect(j*cell, i*cell, cell, cell);
+                ctx.fillStyle = "#fff";
+                ctx.fillText(val, j*cell+cell/3, i*cell+cell/2);
+            }
+            ctx.fillStyle = "#000";
+            for (let i = 0; i < n; i++) {
+                ctx.fillText(classes[i], i*cell+cell/3, canvas.height-5);
+                ctx.fillText(classes[i], 5, i*cell+cell/2);
+            }
+        }
+        function drawActivations(acts) {
+            const div = document.getElementById('activations');
+            div.innerHTML = "";
+            for (const [layer, maps] of Object.entries(acts)) {
+                div.innerHTML += `<b>${layer}</b><br>`;
+                for (let i = 0; i < Math.min(4, maps.length); i++) {
+                    const arr = maps[i];
+                    const w = 200, h = 40;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w; canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.strokeStyle = "#d32f2f";
+                    ctx.beginPath();
+                    for (let j = 0; j < arr.length; j++) {
+                        const x = j * w / arr.length;
+                        const y = h - (arr[j] * h);
+                        if (j === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                    div.appendChild(canvas);
+                }
+            }
         }
     </script>
 </body>
