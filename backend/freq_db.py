@@ -1,4 +1,3 @@
-from backend.freq_db import FREQ_DB
 
 FREQ_DB = [
     {"range": (88, 108), "label": "FM-радио", "mod": "FM", "usage": "Гражданское вещание"},
@@ -11,18 +10,3 @@ FREQ_DB = [
     {"range": (1575.42, 1575.42), "label": "GPS L1", "mod": "DSSS", "usage": "Навигация (GPS)"},
     {"range": (3500, 3700), "label": "5G NR", "mod": "QAM, OFDM", "usage": "Мобильная связь 5G"},
 ]
-
-def match_frequency(freq_mhz):
-    for band in FREQ_DB:
-        low, high = band["range"]
-        if low <= freq_mhz <= high:
-            return {
-                "label": band["label"],
-                "modulation": band["mod"],
-                "usage": band["usage"]
-            }
-    return {
-        "label": "Неизвестно",
-        "modulation": "?",
-        "usage": "Не удалось определить диапазон"
-    }
