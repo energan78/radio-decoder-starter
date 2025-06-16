@@ -1,4 +1,4 @@
-from .freq_db import FREQ_DB
+from backend.freq_db import FREQ_DB
 
 def match_frequency(freq_mhz):
     for band in FREQ_DB:
