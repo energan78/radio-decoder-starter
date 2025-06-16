@@ -1,4 +1,5 @@
 import os
+import re
 import numpy as np
 import soundfile as sf
 
@@ -23,3 +24,12 @@ def load_signal(filepath):
         except Exception:
             data = np.fromfile(filepath, dtype=np.float32)
     return data
+
+def extract_freq_from_filename(filename):
+    """
+    Извлекает частоту в МГц из имени файла, например: gsm_936.wav -> 936.0
+    """
+    match = re.search(r'(\d+(?:\.\d+)?)', filename)
+    if match:
+        return float(match.group(1))
+    return None

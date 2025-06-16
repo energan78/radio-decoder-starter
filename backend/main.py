@@ -19,7 +19,10 @@ from vosk import Model, KaldiRecognizer
 import wave
 import json
 import subprocess
-from backend.signal_utils import load_signal
+from backend.signal_utils import load_signal, get_class_stats, extract_freq_from_filename
+import joblib
+from backend.analyzer import analyze_signal_file
+from backend.match_freq_band import match_frequency
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -181,6 +184,13 @@ async def add_signal(
         "length": len(data),
         "dtype": str(data.dtype)
     }
+    # Определяем частоту и генерируем комментарий
+    freq_mhz = extract_freq_from_filename(file.filename)
+    if freq_mhz is not None:
+        # далее используйте freq_mhz для match_frequency и генерации комментария
+        comment_data = match_frequency(freq_mhz)
+        comment = f"{comment_data['label']} — {comment_data['usage']} (модуляция: {comment_data['modulation']})"
+
     return {"status": "ok", "info": info}
 
 VOSK_MODEL_PATH = "backend/vosk-model-ru"
@@ -226,7 +236,7 @@ async def recognize_speech(file: UploadFile = File(...)):
 @app.post("/recognize_speech_offline", response_model=SpeechRecognitionResponse, summary="Офлайн-распознавание речи из аудиофайла")
 async def recognize_speech_offline(file: UploadFile = File(...)):
     try:
-        # Сохраняем файл во временный WAV
+        # Сохраняем файл во времний WAV
         temp_path = f"/tmp/{file.filename}"
         async with aiofiles.open(temp_path, "wb") as f:
             await f.write(await file.read())
@@ -283,85 +293,20 @@ async def analyze_signal(
     signal_type: str = Form(...),
     comment: str = Form(None)
 ):
-    # Сохраняем временный файл
     temp_path = f"backend/temp/{file.filename}"
     os.makedirs(os.path.dirname(temp_path), exist_ok=True)
     with open(temp_path, "wb") as f_out:
         f_out.write(await file.read())
-    data = load_signal(temp_path)
-    info = {
-        "length": len(data),
-        "dtype": str(data.dtype)
-    }
-    # Временной ряд и спектр
-    waveform = (data[:1024] / np.max(np.abs(data[:1024]))).tolist()
-    spectrum = (np.abs(np.fft.fft(data[:1024])) / np.max(np.abs(np.fft.fft(data[:1024])))).tolist()
 
-    # Проверка через модель RadioML
-    prediction, probs, classes = None, None, None
-    try:
-        from backend.train_signal_model import ConvSignalNet, SAMPLE_LEN
-        import torch
-        model_data = torch.load("backend/signal_model.pth", map_location="cpu")
-        model = ConvSignalNet(num_classes=len(model_data["classes"]))
-        model.load_state_dict(model_data["model_state"])
-        model.eval()
-        x = np.abs(data[:SAMPLE_LEN]).astype(np.float32)
-        x = torch.tensor(x).unsqueeze(0)
-        out = model(x)
-        probs = torch.softmax(out, dim=1).detach().cpu().numpy()[0].tolist()
-        pred_idx = int(np.argmax(probs))
-        prediction = model_data["classes"][pred_idx]
-        classes = model_data["classes"]
-        info["prediction"] = prediction
-    except Exception:
-        pass
+    result = analyze_signal_file(
+        temp_path,
+        model_pytorch=model_pytorch,
+        model_rf=model_rf,
+        model_svm=model_svm,
+        sample_len=1024
+    )
 
-    # Проверка через Vosk (если аудиофайл)
-    vosk_text = None
-    try:
-        import soundfile as sf
-        import vosk
-        if os.path.exists("backend/vosk-model-ru"):
-            model = vosk.Model("backend/vosk-model-ru")
-            audio, rate = sf.read(temp_path)
-            if audio.ndim > 1:
-                audio = audio[:, 0]
-            import wave
-            import tempfile
-            # Сохраняем как wav для vosk
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as wavf:
-                sf.write(wavf.name, audio, rate)
-                import subprocess
-                result = subprocess.run(
-                    ["ffmpeg", "-y", "-i", wavf.name, "-ar", "16000", "-ac", "1", "-f", "wav", wavf.name + "_16k.wav"],
-                    capture_output=True
-                )
-                wf = wave.open(wavf.name + "_16k.wav", "rb")
-                rec = vosk.KaldiRecognizer(model, wf.getframerate())
-                vosk_text = ""
-                while True:
-                    data_bytes = wf.readframes(4000)
-                    if len(data_bytes) == 0:
-                        break
-                    if rec.AcceptWaveform(data_bytes):
-                        vosk_text += rec.Result()
-                vosk_text += rec.FinalResult()
-                wf.close()
-                os.remove(wavf.name + "_16k.wav")
-            os.remove(wavf.name)
-    except Exception:
-        pass
-
-    return JSONResponse({
-        "info": info,
-        "waveform": waveform,
-        "spectrum": spectrum,
-        "prediction": prediction,
-        "probs": probs,
-        "classes": classes,
-        "vosk_text": vosk_text
-    })
+    return result
 
 @app.get("/settings")
 def get_settings():
@@ -469,3 +414,40 @@ def train_model():
     # Запуск обучения в фоне (можно доработать под вашу ОС)
     subprocess.Popen(["python3", "backend/train_signal_model.py"])
     return {"status": "training started"}
+
+# Загрузка моделей (один раз при старте)
+import torch
+from backend.train_signal_model import ConvSignalNet, SAMPLE_LEN
+
+model_pytorch = None
+model_rf = None
+model_svm = None
+
+try:
+    model_data = torch.load("backend/signal_model.pth", map_location="cpu")
+    model_pytorch = ConvSignalNet(num_classes=len(model_data["classes"]))
+    model_pytorch.load_state_dict(model_data["model_state"])
+    model_pytorch.eval()
+    model_pytorch.classes = model_data["classes"]
+except Exception:
+    pass
+
+try:
+    model_rf = joblib.load("backend/rf_model.pkl")
+except Exception:
+    pass
+
+try:
+    model_svm = joblib.load("backend/svm_model.pkl")
+except Exception:
+    pass
+
+@app.get("/signal_stats")
+def signal_stats():
+    """
+    Возвращает статистику по классам сигналов для интерфейса.
+    """
+    return get_class_stats()
+
+# TODO: Определить частоту файла, сопоставить с базой диапазонов
+# и автоматически сгенерировать человекочитаемый комментарий о типе сигнала.

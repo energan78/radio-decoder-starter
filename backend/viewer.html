@@ -18,27 +18,20 @@
         <thead>
             <tr>
                 <th>Имя файла</th>
+                <th>Частота (МГц)</th>
                 <th>Класс</th>
+                <th>Модуляция</th>
                 <th>Комментарий</th>
-                <th>Спектр</th>
-                <th>Редактировать</th>
             </tr>
         </thead>
         <tbody>
-        {% for s in signals %}
+        {% for file in signals %}
             <tr>
-                <td>{{ s.filename }}</td>
-                <td>{{ s.class }}</td>
-                <td>{{ s.comment if s.comment else "" }}</td>
-                <td><a href="/fft/{{ s.filename }}" target="_blank">Показать FFT</a></td>
-                <td>
-                    <form action="/update" method="post">
-                        <input type="hidden" name="filename" value="{{ s.filename }}">
-                        <input type="text" name="new_class" value="{{ s.class }}">
-                        <input type="text" name="comment" placeholder="Комментарий" value="{{ s.comment if s.comment else '' }}">
-                        <button type="submit">Обновить</button>
-                    </form>
-                </td>
+                <td>{{ file.filename }}</td>
+                <td>{{ file.freq_mhz }} MHz</td>
+                <td>{{ file.label }}</td>
+                <td>{{ file.modulation }}</td>
+                <td>{{ file.comment }}</td>
             </tr>
         {% endfor %}
         </tbody>
