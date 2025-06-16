@@ -18,10 +18,10 @@ class SignalDataset(Dataset):
     Класс PyTorch Dataset для работы с сигналами из собственной библиотеки и RadioML.
     """
     def __init__(self, root_dir, sample_len=1024, radioml2018_path=None):
-        # self.samples — список (путь к файлу или массив, метка)
-        # self.class_to_idx — словарь: класс -> индекс
-        # self.classes — список имён классов
-        # ...дальше по коду...
+        self.samples = []
+        self.labels = []
+        self.classes = []
+        self.class_to_idx = {}
 
         # 1. Собственные данные
         if os.path.exists(root_dir):

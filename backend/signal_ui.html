@@ -34,18 +34,15 @@
         </form>
         <div id="status"></div>
         <div class="info-block" id="signalInfo"></div>
-
-        <!-- График временного ряда -->
         <h3>Временной ряд</h3>
         <canvas id="waveform" width="600" height="180"></canvas>
-
-        <!-- График спектра -->
         <h3>Спектр</h3>
         <canvas id="spectrum" width="600" height="180"></canvas>
-
-        <!-- Вероятности по классам -->
-        <h3>Вероятности по классам</h3>
+        <h3>Результат классификации (RadioML)</h3>
+        <div id="mlResult"></div>
         <canvas id="probs" width="600" height="180"></canvas>
+        <h3>Результат распознавания речи (Vosk)</h3>
+        <div id="voskResult"></div>
 
         <!-- Активации слоёв -->
         <h3>Активации сверточных слоёв</h3>
@@ -68,9 +65,6 @@
             const signal_type = document.getElementById('signal_type').value;
             const comment = document.getElementById('comment').value;
             if (!file) return;
-            lastFile = file;
-            lastType = signal_type;
-            lastComment = comment;
             const formData = new FormData();
             formData.append('file', file);
             formData.append('signal_type', signal_type);
@@ -79,14 +73,26 @@
             const res = await fetch('/analyze_signal', { method: 'POST', body: formData });
             if (res.ok) {
                 const data = await res.json();
-                drawWaveform(data.waveform);
-                drawSpectrum(data.spectrum);
-                if (data.probs && data.classes) drawProbs(data.probs, data.classes);
-                if (data.confusion_matrix && data.classes) drawConfusion(data.confusion_matrix, data.classes);
-                if (data.activations) drawActivations(data.activations);
                 document.getElementById('status').textContent = "Сигнал загружен и проанализирован!";
                 document.getElementById('status').className = "success";
-                document.getElementById('saveBtn').style.display = "block";
+                // Визуализация
+                drawWaveform(data.waveform);
+                drawSpectrum(data.spectrum);
+                // Классификация RadioML
+                let mlHtml = "";
+                if (data.prediction) {
+                    mlHtml += `<b>Класс:</b> ${data.prediction}<br>`;
+                }
+                if (data.probs && data.classes) {
+                    drawProbs(data.probs, data.classes);
+                }
+                document.getElementById('mlResult').innerHTML = mlHtml;
+                // Vosk
+                if (data.vosk_text) {
+                    document.getElementById('voskResult').innerText = data.vosk_text;
+                } else {
+                    document.getElementById('voskResult').innerText = "Нет результата или не аудиофайл";
+                }
             } else {
                 document.getElementById('status').textContent = "Ошибка анализа!";
                 document.getElementById('status').className = "error";

@@ -283,12 +283,6 @@ async def analyze_signal(
     signal_type: str = Form(...),
     comment: str = Form(None)
 ):
-    """
-    Анализирует загруженный сигнал:
-    - строит временной ряд и спектр
-    - классифицирует с помощью модели (если есть)
-    - возвращает вероятности, активации слоёв, матрицу неточностей
-    """
     # Сохраняем временный файл
     temp_path = f"backend/temp/{file.filename}"
     os.makedirs(os.path.dirname(temp_path), exist_ok=True)
@@ -299,9 +293,11 @@ async def analyze_signal(
         "length": len(data),
         "dtype": str(data.dtype)
     }
+    # Временной ряд и спектр
     waveform = (data[:1024] / np.max(np.abs(data[:1024]))).tolist()
     spectrum = (np.abs(np.fft.fft(data[:1024])) / np.max(np.abs(np.fft.fft(data[:1024])))).tolist()
-    # Классификация и вероятности
+
+    # Проверка через модель RadioML
     prediction, probs, classes = None, None, None
     try:
         from backend.train_signal_model import ConvSignalNet, SAMPLE_LEN
@@ -320,40 +316,52 @@ async def analyze_signal(
         info["prediction"] = prediction
     except Exception:
         pass
-    # Активации слоёв
-    activations = {}
+
+    # Проверка через Vosk (если аудиофайл)
+    vosk_text = None
     try:
-        import torch
-        acts = {}
-        def hook_fn(name):
-            def hook(module, input, output):
-                acts[name] = output.detach().cpu().numpy()
-            return hook
-        for name, layer in model.named_modules():
-            if isinstance(layer, torch.nn.Conv1d):
-                layer.register_forward_hook(hook_fn(name))
-        model(x)
-        for k, v in acts.items():
-            activations[k] = v[0][:4, :128].tolist()  # первые 4 карты, 128 точек
+        import soundfile as sf
+        import vosk
+        if os.path.exists("backend/vosk-model-ru"):
+            model = vosk.Model("backend/vosk-model-ru")
+            audio, rate = sf.read(temp_path)
+            if audio.ndim > 1:
+                audio = audio[:, 0]
+            import wave
+            import tempfile
+            # Сохраняем как wav для vosk
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as wavf:
+                sf.write(wavf.name, audio, rate)
+                import subprocess
+                result = subprocess.run(
+                    ["ffmpeg", "-y", "-i", wavf.name, "-ar", "16000", "-ac", "1", "-f", "wav", wavf.name + "_16k.wav"],
+                    capture_output=True
+                )
+                wf = wave.open(wavf.name + "_16k.wav", "rb")
+                rec = vosk.KaldiRecognizer(model, wf.getframerate())
+                vosk_text = ""
+                while True:
+                    data_bytes = wf.readframes(4000)
+                    if len(data_bytes) == 0:
+                        break
+                    if rec.AcceptWaveform(data_bytes):
+                        vosk_text += rec.Result()
+                vosk_text += rec.FinalResult()
+                wf.close()
+                os.remove(wavf.name + "_16k.wav")
+            os.remove(wavf.name)
     except Exception:
         pass
-    # Матрица неточностей
-    confusion_matrix = None
-    try:
-        if os.path.exists("backend/confusion_matrix.npy"):
-            confusion_matrix = np.load("backend/confusion_matrix.npy").tolist()
-    except Exception:
-        pass
-    return {
+
+    return JSONResponse({
         "info": info,
         "waveform": waveform,
         "spectrum": spectrum,
         "prediction": prediction,
         "probs": probs,
         "classes": classes,
-        "activations": activations,
-        "confusion_matrix": confusion_matrix
-    }
+        "vosk_text": vosk_text
+    })
 
 @app.get("/settings")
 def get_settings():
