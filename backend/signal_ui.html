@@ -73,6 +73,13 @@
             const res = await fetch('/analyze_signal', { method: 'POST', body: formData });
             if (res.ok) {
                 const data = await res.json();
+                let infoHtml = "";
+                if (data.freq_mhz) infoHtml += `<b>Частота:</b> ${data.freq_mhz} МГц<br>`;
+                if (data.label) infoHtml += `<b>Диапазон:</b> ${data.label}<br>`;
+                if (data.modulation) infoHtml += `<b>Модуляция:</b> ${data.modulation}<br>`;
+                if (data.usage) infoHtml += `<b>Назначение:</b> ${data.usage}<br>`;
+                if (data.comment) infoHtml += `<b>Комментарий:</b> ${data.comment}<br>`;
+                document.getElementById('signalInfo').innerHTML = infoHtml;
                 document.getElementById('status').textContent = "Сигнал загружен и проанализирован!";
                 document.getElementById('status').className = "success";
                 // Визуализация

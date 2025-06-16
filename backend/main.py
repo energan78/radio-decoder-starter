@@ -298,6 +298,12 @@ async def analyze_signal(
     with open(temp_path, "wb") as f_out:
         f_out.write(await file.read())
 
+    freq_mhz = extract_freq_from_filename(file.filename)
+    band_info = match_frequency(freq_mhz) if freq_mhz else None
+    comment_auto = None
+    if band_info:
+        comment_auto = f"{band_info['label']} — {band_info['usage']} (модуляция: {band_info['modulation']})"
+
     result = analyze_signal_file(
         temp_path,
         model_pytorch=model_pytorch,
@@ -306,7 +312,14 @@ async def analyze_signal(
         sample_len=1024
     )
 
-    return result
+    return {
+        **result,
+        "freq_mhz": freq_mhz,
+        "label": band_info["label"] if band_info else None,
+        "modulation": band_info["modulation"] if band_info else None,
+        "usage": band_info["usage"] if band_info else None,
+        "comment": comment_auto,
+    }
 
 @app.get("/settings")
 def get_settings():
