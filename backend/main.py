@@ -322,7 +322,7 @@ async def analyze_signal(
         model_pytorch=model_pytorch,
         model_rf=model_rf,
         model_svm=model_svm,
-        sample_len=1024
+        sample_len=sample_len
     )
 
     return {
@@ -445,10 +445,14 @@ def train_model():
 import torch
 from backend.train_signal_model import ConvSignalNet, SAMPLE_LEN
 
-model_pytorch = None
-model_rf = None
-model_svm = None
+@app.get("/signal_stats")
+def signal_stats():
+    """
+    Возвращает статистику по классам сигналов для интерфейса.
+    """
+    return get_class_stats()
 
+# Загрузка PyTorch-модели
 try:
     model_data = torch.load("backend/signal_model.pth", map_location="cpu")
     model_pytorch = ConvSignalNet(num_classes=len(model_data["classes"]))
@@ -456,24 +460,20 @@ try:
     model_pytorch.eval()
     model_pytorch.classes = model_data["classes"]
 except Exception:
-    pass
+    model_pytorch = None
 
+# Загрузка RF и SVM моделей
 try:
     model_rf = joblib.load("backend/rf_model.pkl")
 except Exception:
-    pass
+    model_rf = None
 
 try:
     model_svm = joblib.load("backend/svm_model.pkl")
 except Exception:
-    pass
+    model_svm = None
 
-@app.get("/signal_stats")
-def signal_stats():
-    """
-    Возвращает статистику по классам сигналов для интерфейса.
-    """
-    return get_class_stats()
+sample_len = 1024  # или SAMPLE_LEN, если он определён в train_signal_model.py
 
 # TODO: Определить частоту файла, сопоставить с базой диапазонов
 # и автоматически сгенерировать человекочитаемый комментарий о типе сигнала.
