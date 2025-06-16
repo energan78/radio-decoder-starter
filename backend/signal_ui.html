@@ -42,7 +42,12 @@
         <canvas id="spectrum" width="600" height="180"></canvas>
         <h3>Результат классификации (RadioML)</h3>
         <div id="mlResult"></div>
-        <canvas id="probs" width="600" height="180"></canvas>
+        <h3>Random Forest</h3>
+        <div id="rfResult"></div>
+        <h3>SVM</h3>
+        <div id="svmResult"></div>
+        <h3>Аномалия</h3>
+        <div id="anomalyResult"></div>
         <h3>Результат распознавания речи (Vosk)</h3>
         <div id="voskResult"></div>
 
@@ -90,24 +95,52 @@
                 document.getElementById('comment').value = data.comment_auto || "";
                 document.getElementById('status').textContent = "Сигнал загружен и проанализирован!";
                 document.getElementById('status').className = "success";
-                // Визуализация
-                drawWaveform(data.waveform);
-                drawSpectrum(data.spectrum);
-                // Классификация RadioML
+
+                // RadioML
                 let mlHtml = "";
-                if (data.prediction) {
-                    mlHtml += `<b>Класс:</b> ${data.prediction}<br>`;
-                }
-                if (data.probs && data.classes) {
-                    drawProbs(data.probs, data.classes);
+                if (data.pytorch_pred) mlHtml += `<b>RadioML (PyTorch):</b> ${data.pytorch_pred}<br>`;
+                if (data.pytorch_probs && data.classes) {
+                    mlHtml += `<b>Вероятности:</b> ${data.pytorch_probs.map((p,i)=>`${data.classes[i]}: ${p.toFixed(2)}`).join(", ")}<br>`;
+                    drawProbs(data.pytorch_probs, data.classes);
                 }
                 document.getElementById('mlResult').innerHTML = mlHtml;
+
+                // RF
+                let rfHtml = "";
+                if (data.rf_pred) rfHtml += `<b>RandomForest:</b> ${data.rf_pred}<br>`;
+                if (data.rf_probs && data.classes) {
+                    rfHtml += `<b>Вероятности:</b> ${data.rf_probs.map((p,i)=>`${data.classes[i]}: ${p.toFixed(2)}`).join(", ")}<br>`;
+                }
+                document.getElementById('rfResult').innerHTML = rfHtml;
+
+                // SVM
+                let svmHtml = "";
+                if (data.svm_pred) svmHtml += `<b>SVM:</b> ${data.svm_pred}<br>`;
+                if (data.svm_probs && data.classes) {
+                    svmHtml += `<b>Вероятности:</b> ${data.svm_probs.map((p,i)=>`${data.classes[i]}: ${p.toFixed(2)}`).join(", ")}<br>`;
+                }
+                document.getElementById('svmResult').innerHTML = svmHtml;
+
+                // Аномалия
+                if (data.anomaly !== undefined) {
+                    document.getElementById('anomalyResult').innerHTML = `<b>Аномалия:</b> ${data.anomaly ? "Да" : "Нет"}`;
+                }
+
                 // Vosk
                 if (data.vosk_text) {
                     document.getElementById('voskResult').innerText = data.vosk_text;
                 } else {
                     document.getElementById('voskResult').innerText = "Нет результата или не аудиофайл";
                 }
+
+                // Визуализация
+                if (data.waveform) drawWaveform(data.waveform);
+                if (data.spectrum) drawSpectrum(data.spectrum);
+
+                document.getElementById('saveBtn').style.display = "block";
+                lastFile = file;
+                lastType = signal_type;
+                lastComment = comment;
             } else {
                 document.getElementById('status').textContent = "Ошибка анализа!";
                 document.getElementById('status').className = "error";
