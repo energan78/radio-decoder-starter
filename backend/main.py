@@ -26,6 +26,7 @@ from backend.match_freq_band import match_frequency
 from fastapi import Body
 from backend.analyzer import analyze_signal_file
 import joblib
+from backend.freq_db import FREQ_DB
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -477,3 +478,9 @@ sample_len = 1024  # или SAMPLE_LEN, если он определён в trai
 
 # TODO: Определить частоту файла, сопоставить с базой диапазонов
 # и автоматически сгенерировать человекочитаемый комментарий о типе сигнала.
+
+def find_band_by_freq(freq):
+    for band in FREQ_DB:
+        if band["start"] <= freq <= band["end"]:
+            return band
+    return None

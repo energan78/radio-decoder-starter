@@ -87,10 +87,25 @@
                 const data = await res.json();
                 let infoHtml = "";
                 if (data.freq_mhz) infoHtml += `<b>Частота:</b> ${data.freq_mhz} МГц<br>`;
-                if (data.label) infoHtml += `<b>Диапазон:</b> ${data.label}<br>`;
-                if (data.modulation) infoHtml += `<b>Модуляция:</b> ${data.modulation}<br>`;
-                if (data.usage) infoHtml += `<b>Назначение:</b> ${data.usage}<br>`;
-                if (data.comment_auto) infoHtml += `<b>Авто-комментарий:</b> ${data.comment_auto}<br>`;
+                if (data.name) infoHtml += `<b>Название:</b> ${data.name}<br>`;
+                if (data.start && data.end) {
+                    if (data.start !== data.end)
+                        infoHtml += `<b>Диапазон:</b> ${data.start} – ${data.end} МГц<br>`;
+                    else
+                        infoHtml += `<b>Частота диапазона:</b> ${data.start} МГц<br>`;
+                }
+                if (data.modulation && data.modulation !== "-") infoHtml += `<b>Модуляция:</b> ${data.modulation}<br>`;
+                if (data.signal_type && data.signal_type !== "-") infoHtml += `<b>Тип сигнала:</b> ${data.signal_type}<br>`;
+                if (data.manufacturer && data.manufacturer !== "-") infoHtml += `<b>Производитель/Группа:</b> ${data.manufacturer}<br>`;
+                if (data.channel && data.channel !== "-") infoHtml += `<b>Канал:</b> ${data.channel}<br>`;
+                if (data.codec && data.codec !== "-") infoHtml += `<b>Кодек:</b> ${data.codec}<br>`;
+                if (data.encryption && data.encryption !== "-") infoHtml += `<b>Шифрование:</b> ${data.encryption}<br>`;
+                if (data.usage && data.usage !== "-") infoHtml += `<b>Назначение:</b> ${data.usage}<br>`;
+                if (data.extra) {
+                    for (const [key, value] of Object.entries(data.extra)) {
+                        infoHtml += `<b>${key[0].toUpperCase() + key.slice(1)}:</b> ${value}<br>`;
+                    }
+                }
                 document.getElementById('signalInfo').innerHTML = infoHtml;
                 document.getElementById('comment').value = data.comment_auto || "";
                 document.getElementById('status').textContent = "Сигнал загружен и проанализирован!";
