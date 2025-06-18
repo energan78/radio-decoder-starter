@@ -316,7 +316,7 @@ async def analyze_signal(
     band_info = match_frequency(freq_mhz) if freq_mhz else None
     comment_auto = None
     if band_info:
-        comment_auto = f"{band_info['label']} — {band_info['usage']} (модуляция: {band_info['modulation']})"
+        comment_auto = f"{band_info['name']} — {band_info['usage']} (модуляция: {band_info['modulation']})"
 
     result = analyze_signal_file(
         temp_path,
