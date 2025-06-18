@@ -73,7 +73,9 @@ pip install -r backend/requirements.txt
 **Внимание:** Всегда активируйте виртуальное окружение перед запуском!
 
 ```bash
-uvicorn backend.main:app --reload
+uvicorn backend.main:app --reload   внутриний адрес
+
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000  внешний адрес
 ```
 
 - Сервер будет доступен по адресу: http://<ваш_IP>:8000
